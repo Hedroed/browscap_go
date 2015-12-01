@@ -136,13 +136,9 @@ func loadFromIniFile(path string) (*dictionary, error) {
 			}
 
 			// Build expression
-			var ee *expression
-			if bytes.IndexAny([]byte(sectionName), "*?") != -1 {
-				ee = newRegexpExpression(sectionName)
-			} else {
-				ee = newCompareExpression(sectionName)
-			}
+			ee := newRegexpExpression(sectionName)
 			dict.expressions[sectionPrefix] = append(dict.expressions[sectionPrefix], ee)
+			dict.tree.Add(ee)
 
 			// add the expression to the expression list
 			i := len(dict.expressionList)

@@ -3,6 +3,7 @@ package re0
 import (
 	"bytes"
 	"fmt"
+	"unicode/utf8"
 )
 
 const (
@@ -14,85 +15,99 @@ const (
 	MODE_STATIC int = 1
 )
 
-type Expression []iToken
+type Expression []*Token
 
-type iToken interface {
+type Tokens []*Token
+
+type Token struct {
+	buf   []byte
+	skip  int
+	multi bool
 }
 
-type tokenMulti struct {
+func (t *Token) String() string {
+	return fmt.Sprintf("%q %d %t", string(t.buf), t.skip, t.multi)
 }
 
-func (t *tokenMulti) String() string {
-	return "multi: any number of any chars"
+func (t *Token) Shard() byte {
+	if len(t.buf) > 0 {
+		return t.buf[0]
+	} else {
+		return 0
+	}
 }
 
-type tokenSingle struct {
-	count int
+func (t *Token) Equal(t1 *Token) bool {
+	if !bytes.Equal(t.buf, t1.buf) {
+		return false
+	}
+	if t.skip != t1.skip {
+		return false
+	}
+	if t.multi != t1.multi {
+		return false
+	}
+	return true
 }
 
-func (t *tokenSingle) String() string {
-	return fmt.Sprintf("single: %d of any chars", t.count)
+func (t *Token) Fuzzy() bool {
+	return t.multi || t.skip > 0
 }
 
-type tokenStatic struct {
-	buf *bytes.Buffer
-}
-
-func (t *tokenStatic) String() string {
-	return fmt.Sprintf("static: %q", t.buf.String())
+func (t *Token) Less(t1 *Token) bool {
+	return bytes.Compare(t.buf, t1.buf) < 0
 }
 
 type parserState struct {
-	lastToken iToken
+	lastToken *Token
 	lastMode  int
 	exp       Expression
 }
 
-func (self *parserState) process(r rune) {
-	mode := self.modeByR(r)
-	create := false
-
-	// changed
-	if self.lastMode != mode {
-
-		// save prev token
-		if self.lastToken != nil {
-			self.exp = append(self.exp, self.lastToken)
-		}
-
-		// crate new
-		create = true
-	} else {
-		// update
-		switch r {
-		case TOKEN_SINGLE:
-			if self.lastToken != nil {
-				self.lastToken.(*tokenSingle).count++
-			} else {
-				create = true
-			}
-		default:
-			if r != TOKEN_MULTI {
-				if self.lastToken != nil {
-					self.lastToken.(*tokenStatic).buf.WriteRune(r)
-				} else {
-					create = true
-				}
-			}
-		}
+func appendRune(b []byte, r rune) []byte {
+	if r < utf8.RuneSelf {
+		return append(b, byte(r))
 	}
 
-	if create {
-		switch r {
-		case TOKEN_MULTI:
-			self.lastToken = &tokenMulti{}
-		case TOKEN_SINGLE:
-			self.lastToken = &tokenSingle{count: 1}
-		default:
-			buf := new(bytes.Buffer)
-			buf.WriteRune(r)
-			self.lastToken = &tokenStatic{buf: buf}
-		}
+	rb := make([]byte, utf8.UTFMax)
+	n := utf8.EncodeRune(rb, r)
+	return append(b, rb[0:n]...)
+}
+
+func (self *parserState) process(r rune) {
+	mode := self.modeByR(r)
+
+	if self.lastToken == nil {
+		buf := []byte{}
+		self.lastToken = &Token{buf: buf}
+	}
+
+	modMode := false
+	if mode == MODE_MULTI || mode == MODE_SINGLE {
+		modMode = true
+	}
+
+	lastModMode := false
+	if self.lastMode == MODE_MULTI || self.lastMode == MODE_SINGLE {
+		lastModMode = true
+	}
+
+	// changed
+	if self.lastMode > 0 && modMode && !lastModMode {
+		self.exp = append(self.exp, self.lastToken)
+
+		buf := []byte{}
+		self.lastToken = &Token{buf: buf}
+	}
+
+	// update
+	switch r {
+	case TOKEN_SINGLE:
+		self.lastToken.skip++
+	case TOKEN_MULTI:
+		self.lastToken.multi = true
+	default:
+		self.lastToken.buf = appendRune(self.lastToken.buf, r)
 	}
 
 	self.lastMode = mode
@@ -114,50 +129,48 @@ func (self *parserState) last() {
 	}
 }
 
-func (self *parserState) isMultiOrSingle(e iToken) bool {
-	_, ok1 := e.(*tokenMulti)
-	_, ok2 := e.(*tokenSingle)
-	return ok1 || ok2
+func (e *Token) MatchOne(r []byte) (bool, []byte) {
+	if e.skip > 0 {
+		if len(r) < e.skip {
+			return false, nil
+		}
+		r = r[e.skip:]
+	}
+
+	if len(e.buf) == 0 {
+		return e.multi, nil // TODO fix for ** case
+	}
+
+	if len(r) < len(e.buf) {
+		return false, nil
+	}
+
+	if e.multi {
+		ind := bytes.Index(r, e.buf)
+		if ind == -1 {
+			return false, nil
+		}
+		r = r[ind+len(e.buf):]
+	} else {
+		if !bytes.Equal(r[:len(e.buf)], e.buf) {
+			return false, nil
+		}
+		r = r[len(e.buf):]
+	}
+
+	return true, r
 }
 
-func (self Expression) Match(s []byte) bool {
-	reader := bytes.NewBuffer(s)
-	skip := false
-
+func (self Expression) Match(r []byte) bool {
+	match := false
 	for _, e := range self {
-		switch t := e.(type) {
-		case *tokenMulti:
-			skip = true
-		case *tokenSingle:
-			if got := reader.Next(t.count); len(got) != t.count {
-				return false
-			}
-		case *tokenStatic:
-			expect := t.buf.Bytes()
-			if reader.Len() < len(expect) {
-				return false
-			}
-			if !skip {
-				got := reader.Next(len(expect))
-				if !bytes.Equal(got, expect) {
-					return false
-				}
-			} else {
-				// get lat
-				ind := bytes.Index(reader.Bytes(), expect)
-				if ind == -1 {
-					return false
-				}
-				reader.Next(ind + len(expect))
-				skip = false
-			}
+		match, r = e.MatchOne(r)
+		if len(r) == 0 {
+			return match
 		}
 	}
 
-	if !skip && reader.Len() > 0 {
-		return false
-	}
-	return true
+	return false
 }
 
 func Compile(s []byte) Expression {
@@ -175,15 +188,6 @@ func Compile(s []byte) Expression {
 		state.process(r)
 	}
 	state.last()
-
-	// check if multi and single are near to each other
-checkMulti:
-	for i, e := range state.exp {
-		if len(state.exp)-1 > i && state.isMultiOrSingle(e) && state.isMultiOrSingle(state.exp[i+1]) {
-			state.exp = append(state.exp[:i], state.exp[i+1:]...)
-			goto checkMulti
-		}
-	}
 
 	return state.exp
 }

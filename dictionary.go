@@ -9,6 +9,8 @@ type dictionary struct {
 	ngramIndex        map[string]hitPairList
 
 	completeData map[string]map[string]string
+
+	tree *ExpressionTree
 }
 
 type section map[string]string
@@ -23,6 +25,8 @@ func newDictionary() *dictionary {
 		ngramIndex:        make(map[string]hitPairList),
 
 		completeData: make(map[string]map[string]string),
+
+		tree: NewExpressionTree(),
 	}
 }
 

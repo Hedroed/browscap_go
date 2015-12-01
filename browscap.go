@@ -125,6 +125,24 @@ func getLoopBrowserData(userAgent string) (bdata map[string]string, ok bool) {
 }
 
 func searchIndexedBrowserData(userAgent string) (map[string]string, bool) {
+	agent := strings.ToLower(userAgent)
+
+	best := ""
+	for _, res := range dict.tree.Find(agent) {
+		if len(res.Name) > len(best) {
+			best = res.Name
+		}
+	}
+
+	if best == "" {
+		return nil, false
+	}
+
+	data := dict.getData(best)
+	return data, true
+}
+
+func _searchIndexedBrowserData(userAgent string) (map[string]string, bool) {
 	if !initialized {
 		return nil, false
 	}
