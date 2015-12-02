@@ -19,66 +19,57 @@ var (
 	sQuote2  = []byte{'\''} // quote ' signal
 
 	// To reduce memory usage we will keep only next keys
-	keepKeys = [][]byte{
+	keepKeys = map[string]bool{
 		// Required
-		[]byte("Parent"),
+		"Parent": true,
 
 		// Used in Browser
-		[]byte("Browser"),
-		[]byte("Version"),
-		[]byte("MajorVer"),
-		[]byte("MinorVer"),
-		[]byte("Browser_Type"),
-		[]byte("Platform"),
-		[]byte("Platform_Version"),
-		[]byte("Device_Type"),
-		//[]byte("Device_Code_Name"),
-		//[]byte("Device_Brand_Name"),
+		"Browser":          true,
+		"Version":          true,
+		"MajorVer":         true,
+		"MinorVer":         true,
+		"Browser_Type":     true,
+		"Platform":         true,
+		"Platform_Version": true,
+		"Device_Type":      true,
+		//"Device_Code_Name": true,
+		//"Device_Brand_Name": true,
 
-		[]byte("Comment"),
-		[]byte("Browser_Bits"),
-		//[]byte("Browser_Maker"),
-		[]byte("Browser_Modus"),
-		//[]byte("Platform_Description"),
-		[]byte("Platform_Bits"),
-		//[]byte("Platform_Maker"),
-		[]byte("Alpha"),
-		[]byte("Beta"),
-		//[]byte("Win16"),
-		//[]byte("Win32"),
-		//[]byte("Win64"),
-		[]byte("Frames"),
-		[]byte("IFrames"),
-		[]byte("Tables"),
-		[]byte("Cookies"),
-		[]byte("BackgroundSounds"),
-		[]byte("JavaScript"),
-		[]byte("VBScript"),
-		[]byte("JavaApplets"),
-		[]byte("ActiveXControls"),
-		//[]byte("isMobileDevice"),
-		//[]byte("isTablet"),
-		//[]byte("isSyndicationReader"),
-		[]byte("Crawler"),
-		[]byte("CssVersion"),
-		[]byte("AolVersion"),
-		[]byte("Device_Name"),
-		//[]byte("Device_Maker"),
-		[]byte("RenderingEngine_Name"),
-		[]byte("RenderingEngine_Version"),
-		//[]byte("RenderingEngine_Description"),
-		//[]byte("RenderingEngine_Maker"),
+		"Comment":      true,
+		"Browser_Bits": true,
+		//"Browser_Maker": true,
+		"Browser_Modus": true,
+		//"Platform_Description": true,
+		"Platform_Bits": true,
+		//"Platform_Maker": true,
+		"Alpha": true,
+		"Beta":  true,
+		//"Win16": true,
+		//"Win32": true,
+		//"Win64": true,
+		"Frames":           true,
+		"IFrames":          true,
+		"Tables":           true,
+		"Cookies":          true,
+		"BackgroundSounds": true,
+		"JavaScript":       true,
+		"VBScript":         true,
+		"JavaApplets":      true,
+		"ActiveXControls":  true,
+		//"isMobileDevice": true,
+		//"isTablet": true,
+		//"isSyndicationReader": true,
+		"Crawler":     true,
+		"CssVersion":  true,
+		"AolVersion":  true,
+		"Device_Name": true,
+		//"Device_Maker": true,
+		"RenderingEngine_Name":    true,
+		"RenderingEngine_Version": true,
+		//"RenderingEngine_Description": true,
+		//"RenderingEngine_Maker": true,
 	}
 )
-
-func inList(val []byte, list [][]byte) bool {
-	for _, v := range list {
-		if bytes.Equal(val, v) {
-			return true
-		}
-	}
-	return false
-}
 
 func loadFromIniFile(path string) (*dictionary, error) {
 	file, err := os.Open(path)
@@ -140,7 +131,7 @@ func loadFromIniFile(path string) (*dictionary, error) {
 
 		// Parse Key
 		key := bytes.TrimSpace(kv[0])
-		if !inList(key, keepKeys) {
+		if ok, in := keepKeys[string(key)]; !ok || !in {
 			continue
 		}
 

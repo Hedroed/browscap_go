@@ -61,7 +61,6 @@ func (r *ExpressionTree) Add(name string) {
 		last = found
 	}
 
-	last.exp = exp
 	last.name = name
 
 	score := len(name)
@@ -74,17 +73,14 @@ func (r *ExpressionTree) Add(name string) {
 }
 
 type node struct {
+	name string
+
 	nodesPure  map[byte]nodes
 	nodesFuzzy nodes
 
-	token *Token
-
-	name string
-	exp  Expression
-
+	token    *Token
 	topScore int
-
-	parent *node
+	parent   *node
 }
 
 func (n *node) findBest(s []byte, minScore int) (res string, maxScore int) {
