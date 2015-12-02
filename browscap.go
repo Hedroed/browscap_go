@@ -1,12 +1,10 @@
 package browscap_go
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 )
 
@@ -96,43 +94,13 @@ func DownloadFile(saveAs string) error {
 }
 
 func GetBrowserData(userAgent string) (map[string]string, bool) {
-	bdata, ok := searchIndexedBrowserData(userAgent)
-	if ok {
-		return bdata, ok
-	}
-	return getLoopBrowserData(userAgent)
-}
-
-func getLoopBrowserData(userAgent string) (bdata map[string]string, ok bool) {
-	if !initialized {
-		return
-	}
-
-	agent := bytes.ToLower([]byte(userAgent))
-	prefix := getPrefix(userAgent)
-
-	// Main search
-	if bdata, ok = getBrowserData(prefix, agent); ok {
-		return
-	}
-
-	// Fallback
-	if prefix != "*" {
-		bdata, ok = getBrowserData("*", agent)
-	}
-
-	return
+	return searchIndexedBrowserData(userAgent)
 }
 
 func searchIndexedBrowserData(userAgent string) (map[string]string, bool) {
 	agent := strings.ToLower(userAgent)
 
-	best := ""
-	for _, res := range dict.tree.Find(agent) {
-		if len(res.Name) > len(best) {
-			best = res.Name
-		}
-	}
+	best := dict.tree.Find(agent)
 
 	if best == "" {
 		return nil, false
@@ -140,75 +108,4 @@ func searchIndexedBrowserData(userAgent string) (map[string]string, bool) {
 
 	data := dict.getData(best)
 	return data, true
-}
-
-func _searchIndexedBrowserData(userAgent string) (map[string]string, bool) {
-	if !initialized {
-		return nil, false
-	}
-
-	agent := strings.ToLower(userAgent)
-	agentBytes := []byte(agent)
-
-	nonemptyLists := make(hitPairListList, 0)
-
-	for _, ngram := range getNGrams(agent, NGRAM_LEN) {
-		eeIxList, ok := dict.ngramIndex[ngram]
-		if ok && len(eeIxList) > 0 {
-			nonemptyLists = append(nonemptyLists, eeIxList)
-		}
-	}
-
-	sort.Sort(nonemptyLists) // shorter first
-
-	idx := 0
-	for startI := 0; startI < len(nonemptyLists); {
-		for i := startI; i < len(nonemptyLists); i++ {
-			if idx >= len(nonemptyLists[i]) {
-				startI++ // when we ran out of elements in the column, we can move right
-				continue
-			}
-			ee := dict.expressionList[nonemptyLists[i][idx].Key]
-			if ee.Match(agentBytes) {
-				data := dict.getData(ee.Name)
-				return data, true
-			}
-		}
-		idx++
-	}
-
-	return nil, false
-}
-
-type hitPair struct {
-	Key int
-	Val float64
-}
-
-type hitPairList []hitPair
-
-func (p hitPairList) Len() int { return len(p) }
-func (p hitPairList) Less(i, j int) bool {
-	return p[i].Val < p[j].Val
-}
-func (p hitPairList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-
-type hitPairListList []hitPairList
-
-func (p hitPairListList) Len() int { return len(p) }
-func (p hitPairListList) Less(i, j int) bool {
-	return len(p[i]) < len(p[j])
-}
-func (p hitPairListList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-
-func getBrowserData(prefix string, agent []byte) (map[string]string, bool) {
-	if expressions, exists := dict.expressions[prefix]; exists {
-		for _, exp := range expressions {
-			if exp.Match(agent) {
-				data := dict.getData(exp.Name)
-				return data, true
-			}
-		}
-	}
-	return map[string]string{}, false
 }

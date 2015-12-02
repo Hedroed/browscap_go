@@ -5,13 +5,7 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"sort"
-	"strings"
 )
-
-// these constants vere tuned experimentally, dont change them without a good reason
-const NGRAM_LEN = 5
-const MAX_INDEXLIST = 5000
 
 var (
 	// Ini
@@ -77,6 +71,15 @@ var (
 	}
 )
 
+func inList(val []byte, list [][]byte) bool {
+	for _, v := range list {
+		if bytes.Equal(val, v) {
+			return true
+		}
+	}
+	return false
+}
+
 func loadFromIniFile(path string) (*dictionary, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -88,7 +91,6 @@ func loadFromIniFile(path string) (*dictionary, error) {
 
 	buf := bufio.NewReader(file)
 	sectionName := ""
-	sectionPrefix := ""
 
 	for {
 		line, _, err := buf.ReadLine()
@@ -121,7 +123,6 @@ func loadFromIniFile(path string) (*dictionary, error) {
 		// Section line
 		if bytes.HasPrefix(line, sStart) && bytes.HasSuffix(line, sEnd) {
 			sectionName = string(line[1 : len(line)-1])
-			sectionPrefix = getPrefix(sectionName)
 			continue
 		}
 
@@ -130,31 +131,7 @@ func loadFromIniFile(path string) (*dictionary, error) {
 			// Save mapped
 			dict.mapped[sectionName] = make(section)
 
-			// Create prefix for section
-			if _, exists := dict.expressions[sectionPrefix]; !exists {
-				dict.expressions[sectionPrefix] = []*expression{}
-			}
-
-			// Build expression
-			ee := newRegexpExpression(sectionName)
-			dict.expressions[sectionPrefix] = append(dict.expressions[sectionPrefix], ee)
-			dict.tree.Add(ee)
-
-			// add the expression to the expression list
-			i := len(dict.expressionList)
-			score := float64(len(ee.Name))
-			dict.expressionList = append(dict.expressionList, ee)
-			dict.expressionLengths = append(dict.expressionLengths, score)
-			for _, ngram := range getNGrams(strings.ToLower(sectionName), NGRAM_LEN) {
-				if !strings.Contains(ngram, "*") && !strings.Contains(ngram, "?") {
-					expressionIndex, found := dict.ngramIndex[ngram]
-					if !found {
-						expressionIndex = make(hitPairList, 0, 1)
-					}
-					expressionIndex = append(expressionIndex, hitPair{Key: i, Val: score})
-					dict.ngramIndex[ngram] = expressionIndex
-				}
-			}
+			dict.tree.Add(sectionName)
 
 		}
 
@@ -177,28 +154,6 @@ func loadFromIniFile(path string) (*dictionary, error) {
 		}
 
 		dict.mapped[sectionName][string(key)] = string(val)
-	}
-
-	// delete mgrams which are very common
-	toDelete := make(map[string]struct{})
-	for ngram, indexList := range dict.ngramIndex {
-		if len(indexList) > MAX_INDEXLIST {
-			toDelete[ngram] = struct{}{}
-		}
-	}
-	for ngram, _ := range toDelete {
-		delete(dict.ngramIndex, ngram)
-	}
-
-	// Order expressions by length
-	for prefix := range dict.expressions {
-		expressions := dict.expressions[prefix]
-		sort.Sort(expressionByNameLen(expressions))
-		dict.expressions[prefix] = expressions
-	}
-
-	for _, l := range dict.ngramIndex {
-		sort.Sort(sort.Reverse(l))
 	}
 
 	dict.buildCompleteData()

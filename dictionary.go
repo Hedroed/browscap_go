@@ -1,12 +1,7 @@
 package browscap_go
 
 type dictionary struct {
-	expressions map[string][]*expression
-	mapped      map[string]section
-
-	expressionList    []*expression
-	expressionLengths []float64
-	ngramIndex        map[string]hitPairList
+	mapped map[string]section
 
 	completeData map[string]map[string]string
 
@@ -17,12 +12,7 @@ type section map[string]string
 
 func newDictionary() *dictionary {
 	return &dictionary{
-		expressions: make(map[string][]*expression),
-		mapped:      make(map[string]section),
-
-		expressionList:    make([]*expression, 0, 0),
-		expressionLengths: make([]float64, 0, 0),
-		ngramIndex:        make(map[string]hitPairList),
+		mapped: make(map[string]section),
 
 		completeData: make(map[string]map[string]string),
 
@@ -30,23 +20,23 @@ func newDictionary() *dictionary {
 	}
 }
 
-func (self *dictionary) buildCompleteData() {
-	for name, _ := range self.mapped {
-		self.completeData[name] = self.buildData(name)
+func (dict *dictionary) buildCompleteData() {
+	for name, _ := range dict.mapped {
+		dict.completeData[name] = dict.buildData(name)
 	}
 }
 
-func (self *dictionary) getData(name string) map[string]string {
-	return self.completeData[name]
+func (dict *dictionary) getData(name string) map[string]string {
+	return dict.completeData[name]
 }
 
-func (self *dictionary) buildData(name string) map[string]string {
+func (dict *dictionary) buildData(name string) map[string]string {
 	res := make(map[string]string)
 
-	if item, found := self.mapped[name]; found {
+	if item, found := dict.mapped[name]; found {
 		// Parent's data
 		if parentName, hasParent := item["Parent"]; hasParent {
-			parentData := self.buildData(parentName)
+			parentData := dict.buildData(parentName)
 			if len(parentData) > 0 {
 				for k, v := range parentData {
 					if k == "Parent" {
