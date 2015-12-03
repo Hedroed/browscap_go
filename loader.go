@@ -147,7 +147,5 @@ func loadFromIniFile(path string) (*dictionary, error) {
 		dict.mapped[sectionName][string(key)] = string(val)
 	}
 
-	dict.buildCompleteData()
-
 	return dict, nil
 }

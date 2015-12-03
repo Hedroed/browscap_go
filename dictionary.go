@@ -20,14 +20,13 @@ func newDictionary() *dictionary {
 	}
 }
 
-func (dict *dictionary) buildCompleteData() {
-	for name, _ := range dict.mapped {
-		dict.completeData[name] = dict.buildData(name)
-	}
-}
-
 func (dict *dictionary) getData(name string) map[string]string {
-	return dict.completeData[name]
+	if d, ok := dict.completeData[name]; ok {
+		return d
+	}
+	d := dict.buildData(name)
+	dict.completeData[name] = d
+	return d
 }
 
 func (dict *dictionary) buildData(name string) map[string]string {

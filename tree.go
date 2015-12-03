@@ -84,18 +84,20 @@ type node struct {
 	token    *Token
 	topScore int
 	parent   *node
+
+	lastMatch *node
 }
 
 func (n *node) findBest(s []byte, minScore int) (res string, maxScore int) {
-	if n.topScore < minScore {
-		return "", minScore
+	if n.topScore <= minScore {
+		return "", -1
 	}
 
 	match := false
 	if n.token != nil {
 		match, s = n.token.MatchOne(s)
 		if !match {
-			return "", minScore
+			return "", n.topScore
 		}
 
 		if n.name != "" {
@@ -105,26 +107,48 @@ func (n *node) findBest(s []byte, minScore int) (res string, maxScore int) {
 	}
 
 	if len(s) > 0 {
-		for _, nd := range n.nodesPure[s[0]] {
+		if n.lastMatch != nil {
+			r, ms := n.lastMatch.findBest(s, minScore)
+			if r != "" && ms > minScore {
+				res = r
+				minScore = ms
+			}
+		}
+
+		for i, nd := range n.nodesPure[s[0]] {
+			if nd == n.lastMatch {
+				continue
+			}
+
 			r, ms := nd.findBest(s, minScore)
+			if ms < minScore {
+				break
+			}
+
 			if r != "" {
-				if ms > minScore {
-					res = r
-					minScore = ms
-				} else {
-					break
+				res = r
+				minScore = ms
+				if i > 0 {
+					n.lastMatch = nd
 				}
 			}
 		}
 
-		for _, nd := range n.nodesFuzzy {
+		for i, nd := range n.nodesFuzzy {
+			if nd == n.lastMatch {
+				continue
+			}
+
 			r, ms := nd.findBest(s, minScore)
+			if ms < minScore {
+				break
+			}
+
 			if r != "" {
-				if ms > minScore {
-					res = r
-					minScore = ms
-				} else {
-					break
+				res = r
+				minScore = ms
+				if i > 0 {
+					n.lastMatch = nd
 				}
 			}
 		}
