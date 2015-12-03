@@ -62,11 +62,11 @@ func (t *Token) MatchOne(r []byte) (bool, []byte) {
 		r = r[t.skip:]
 	}
 
-	if len(t.match) == 0 {
-		return t.multi, nil
-	}
+	n := len(t.match)
 
-	if len(r) < len(t.match) {
+	if n == 0 {
+		return t.multi, nil
+	} else if len(r) < n {
 		return false, nil
 	}
 
@@ -75,15 +75,13 @@ func (t *Token) MatchOne(r []byte) (bool, []byte) {
 		if ind == -1 {
 			return false, nil
 		}
-		r = r[ind+len(t.match):]
-	} else {
-		if !bytes.Equal(r[:len(t.match)], t.match) {
-			return false, nil
-		}
-		r = r[len(t.match):]
+		return true, r[ind+n:]
 	}
 
-	return true, r
+	if !bytes.Equal(r[:n], t.match) {
+		return false, nil
+	}
+	return true, r[n:]
 }
 
 type parserState struct {
