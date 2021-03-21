@@ -63,6 +63,11 @@ func (t *Token) MatchOne(r []byte) (bool, []byte) {
 			return false, nil
 		}
 		r = r[t.skip:]
+
+		// fix issue when pattern finish with question mark
+		if len(t.match) == 0 && !t.multi {
+			return true, r
+		}
 	}
 
 	n := len(t.match)

@@ -94,13 +94,152 @@ func TestGetBrowserIssues(t *testing.T) {
 		t.Errorf("Expected Apache Bench %q", browser.Browser)
 	}
 
-	// Rule sorting issue (score by rule lenght not by line number)
+	// Rule sorting issue (score by rule length not by line number)
 	ua = "Mozilla/5.0 (Linux; Android 7.1.1; SM-T377T Build/NMF26X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.83 Safari/537.36"
 	if browser, ok := GetBrowser(ua); !ok {
 		t.Error("Browser not found")
 	} else if browser.DeviceType != "Tablet" {
 		t.Errorf("Expected Tablet %q", browser.DeviceType)
 	}
+
+	// Rule sorting issue (score by rule length minus count of special character not by line number)
+	ua = "Mozilla/5.0 (Windows NT 6.0; en-us) AppleWebKit/123 (KHTML like Gecko) Arora/0.3 Safari/12"
+	if browser, ok := GetBrowser(ua); !ok {
+		t.Error("Browser not found")
+	} else if browser.Browser != "Arora" {
+		t.Errorf("Expected Arora %q", browser.DeviceType)
+	}
+
+	// Trailing question mark handling bug
+	ua = "Mozilla/5.0 (Linux Arch x86; PPC-41 rv:1.8.5) Gecko/20012345"
+	if browser, ok := GetBrowser(ua); !ok {
+		t.Error("Browser not found")
+	} else if browser.DeviceName != "Linux Desktop" {
+		t.Errorf("Expected Linux Desktop %q", browser.Browser)
+	}
+}
+
+func TestTokenMatchOne(t *testing.T) {
+	abc := []byte{97, 98, 99}        // "abc"
+	abcd := []byte{97, 98, 99, 100}  // "abcd"
+	n5 := []byte{48, 49, 50, 51, 52} // "01234"
+	n2 := []byte{50, 51}             // "23"
+	empty := []byte{}
+
+	u := &Token{
+		match: empty,
+		multi: false,
+		skip:  0,
+	}
+	if ok, _ := u.MatchOne(empty); ok {
+		t.Error("Match 1 error")
+	}
+	if ok, _ := u.MatchOne(abc); ok {
+		t.Error("Match 2 error")
+	}
+
+	u = &Token{
+		match: abc,
+		multi: false,
+		skip:  0,
+	}
+	if ok, _ := u.MatchOne(abc); !ok {
+		t.Error("Match 3 error")
+	}
+	if ok, rest := u.MatchOne(abcd); !ok || rest[0] != 'd' {
+		t.Error("Match 4 error")
+	}
+	if ok, _ := u.MatchOne(empty); ok {
+		t.Error("Match 5 error")
+	}
+
+	u = &Token{
+		match: empty,
+		multi: false,
+		skip:  4,
+	}
+	if ok, rest := u.MatchOne(n5); !ok || len(rest) != 1 || rest[0] != '4' {
+		t.Errorf("Match 6 error (ok %v, rest %v)", ok, rest)
+	}
+	if ok, _ := u.MatchOne(abc); ok {
+		t.Error("Match 7 error")
+	}
+
+	u = &Token{
+		match: n2,
+		multi: false,
+		skip:  2,
+	}
+	if ok, rest := u.MatchOne(n5); !ok || rest[0] != '4' {
+		t.Error("Match 8 error")
+	}
+	if ok, _ := u.MatchOne(n2); ok {
+		t.Error("Match 9 error")
+	}
+	if ok, _ := u.MatchOne([]byte{50, 51, 48, 48}); ok { // "2300"
+		t.Error("Match 10 error")
+	}
+
+	u = &Token{
+		match: empty,
+		multi: true,
+		skip:  0,
+	}
+	if ok, _ := u.MatchOne(empty); !ok {
+		t.Error("Match 11 error")
+	}
+	if ok, _ := u.MatchOne(abc); !ok {
+		t.Error("Match 12 error")
+	}
+
+	u = &Token{
+		match: abc,
+		multi: true,
+		skip:  0,
+	}
+	if ok, rest := u.MatchOne([]byte{48, 97, 98, 99, 100}); !ok || rest[0] != 'd' { // "0abcd"
+		t.Error("Match 13 error")
+	}
+	if ok, rest := u.MatchOne(abc); !ok || len(rest) != 0 {
+		t.Error("Match 14 error")
+	}
+	if ok, _ := u.MatchOne(n5); ok {
+		t.Error("Match 15 error")
+	}
+
+	u = &Token{
+		match: empty,
+		multi: true,
+		skip:  4,
+	}
+	if ok, _ := u.MatchOne(abcd); !ok {
+		t.Error("Match 16 error")
+	}
+	if ok, rest := u.MatchOne(n5); !ok || len(rest) != 0 {
+		t.Error("Match 17 error")
+	}
+	if ok, _ := u.MatchOne(abc); ok {
+		t.Error("Match 18 error")
+	}
+
+	u = &Token{
+		match: n2,
+		multi: true,
+		skip:  2,
+	}
+	if ok, rest := u.MatchOne(n5); !ok || rest[0] != '4' {
+		t.Error("Match 19 error")
+	}
+	if ok, _ := u.MatchOne([]byte{97, 98, 99, 48, 49, 50, 51}); !ok { // "abc0123"
+		t.Error("Match 20 error")
+	}
+	if ok, _ := u.MatchOne([]byte{49, 50, 51}); ok { // "132"
+		t.Error("Match 21 error")
+	}
+	if ok, _ := u.MatchOne(n2); ok {
+		t.Error("Match 22 error")
+	}
+
 }
 
 func TestLastVersion(t *testing.T) {

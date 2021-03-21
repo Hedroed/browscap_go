@@ -27,12 +27,27 @@ func (r *ExpressionTree) Find(userAgent []byte) string {
 	return res
 }
 
+// computeScore fix issue when a pattern with * or ? as same score as pattern with character instead
+func computeScore(exp Expression, s []byte) int {
+	score := len(s) * 10
+	for _, e := range exp {
+		score -= e.skip
+		if e.multi {
+			score -= 1
+		}
+	}
+	if score < 0 {
+		return 0
+	}
+	return score
+}
+
 func (r *ExpressionTree) Add(name string, lineNum int) {
 	nameBytes := mapToBytes(unicode.ToLower, name)
 	exp := CompileExpression(nameBytes)
 	bytesPool.Put(nameBytes)
 
-	score := len(name)
+	score := computeScore(exp, nameBytes)
 
 	last := r.root
 	for _, e := range exp {

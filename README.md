@@ -63,12 +63,22 @@ RenderingEngineName    string
 RenderingEngineVersion string
 ```
 
-Bechmark
+Benchmark
 --------
 
 ```
 BenchmarkInit-4         	       1	2256895168 ns/op	346136904 B/op	 5700912 allocs/op
 BenchmarkGetBrowser-4   	   10000	    140975 ns/op	      37 B/op	       1 allocs/op
+```
+
+My Benchmark
+--------
+
+```
+goos: linux
+goarch: amd64
+BenchmarkInit-12          	       1	2479319848 ns/op	711650336 B/op	11695215 allocs/op
+BenchmarkGetBrowser-12    	   15080	     76580 ns/op	      32 B/op	       1 allocs/op
 ```
 
 ## License
